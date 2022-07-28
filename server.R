@@ -233,7 +233,7 @@ shinyServer(function(input, output) {
               Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
                               levels = c("Yes", "No")),
               Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
-                             levels = c("Yes", "No"))
+                             levels = c("Yes", "No")),
               breast.5 = LFSPRO.rlt$breast.5,
               breast.10 = LFSPRO.rlt$breast.10,
               breast.15 = LFSPRO.rlt$breast.15,
