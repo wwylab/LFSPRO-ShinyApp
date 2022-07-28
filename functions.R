@@ -21,6 +21,7 @@ runLFSPRO <- function(fam.data, cancer.data, counselee.id){
   
   rlt <- data.frame(
     id = counselee.id$id,
+    gene.testing = fam.data[fam.data$id %in% counselee.id$id,]$gene.testing,
     classic = rlt.classic$result,
     chompret = rlt.chompret$result,
     carrier = rlt.lfspro$Mutation_probability$mutation_probability,
@@ -72,6 +73,7 @@ dummy.create <- function(fam.data) {
   mid[mid == 0] <- NA
   gender <- fam$gender
   age <- fam$age
+  gene.testing <- fam$gene.testing
   vital <- fam$vital
   proband <- fam$proband
   dummy <- rep(0, length(id))
@@ -83,6 +85,7 @@ dummy.create <- function(fam.data) {
   mid <- c(mid, rep(NA, n))
   gender <- c(gender, rep(1, n))
   age <- c(age, rep(1, n))
+  gene.testing <- c(gene.testing, rep(NA, n))
   vital <- c(vital, rep('A', n))
   proband <- c(proband, rep('N', n))
   dummy <- c(dummy, rep(1, n))
@@ -94,6 +97,7 @@ dummy.create <- function(fam.data) {
   mid <- c(mid, rep(NA, n))
   gender <- c(gender, rep(0, n))
   age <- c(age, rep(1, n))
+  gene.testing <- c(gene.testing, rep(NA, n))
   vital <- c(vital, rep('A', n))
   proband <- c(proband, rep('N', n))
   dummy <- c(dummy, rep(1, n))
@@ -101,25 +105,44 @@ dummy.create <- function(fam.data) {
   for (j in 1:length(id)) {
     add <- FALSE
     if (is.na(fid[j]) & !is.na(mid[j])) {
-      fid[j] <- max(id) + 1
-      gender <- c(gender, 1)
-      add <- TRUE
+      mid.j <- mid[j]
+      fid.j <- fid[mid==mid.j]
+      fid.j <- unique(na.omit(fid.j))
+      if (length(fid.j) == 1){
+        fid[j] <- fid.j
+      }else if(length(fid.j) > 1){
+        fid[j] <- sample(fid.j,1)
+      }else{
+        fid[j] <- max(id) + 1
+        gender <- c(gender, 1)
+        add <- TRUE
+      }
     } else if (!is.na(fid[j]) & is.na(mid[j])) {
-      mid[j] <- max(id) + 1
-      gender <- c(gender, 0)
-      add <- TRUE
+      fid.j <- fid[j]
+      mid.j <- mid[fid==fid.j]
+      mid.j <- unique(na.omit(mid.j))
+      if (length(mid.j) == 1){
+        mid[j] <- mid.j
+      }else if (length(mid.j) > 1){
+        mid[j] <- sample(mid.j,1)
+      }else{
+        mid[j] <- max(id) + 1
+        gender <- c(gender, 0)
+        add <- TRUE
+      }
     }
     if (add == TRUE) {
       id <- c(id, max(id) + 1)
       fid <- c(fid, NA)
       mid <- c(mid, NA)
       age <- c(age, 1)
+      gene.testing <- c(gene.testing, NA)
       vital <- c(vital, 'A')
       proband <- c(proband, 'N')
       dummy <- c(dummy, 1)
     }
   }
-  fam <- data.frame(id, fid, mid, gender, age, vital, proband, dummy)
+  fam <- data.frame(id, fid, mid, gender, age, gene.testing, vital, proband, dummy)
   return(fam)
 }
 
@@ -380,5 +403,34 @@ lfspro.pop <- function(fam.data, cancer.data, counselee.id, penetrance.all=NULL,
   return(output)
 }
 
+##############################Updated ages/correct gender in family data
 
+fam.update <- function(fam.data, cancer.data){
+  id <- fam.data$id
+  cancer.id <- unique(cancer.data$id)
+  fam.data$gender[fam.data$gender==2] <- 0
+  if (length(cancer.id) > 0){
+    for (i in cancer.id){
+      row.i <- which(id == i)
+      age.i <- fam.data$age[row.i]
+      diag.age.i <- cancer.data$diag.age[cancer.data$id == i]
+      if (sum(is.na(diag.age.i)) < length(diag.age.i)){
+        max.diag <- max(na.omit(diag.age.i))
+        if (is.na(age.i) || (age.i < max.diag)){fam.data$age[row.i] = max.diag}
+      }
+    }
+  }
+  if (!("gene.testing" %in% colnames(fam.data))) {
+    fam.data$gene.testing <- ""
+  }
+  return(fam.data)
+}
+
+fam.genelevel <- function(gene.testing){
+  gene.abbrev <- c('TN', 'UN', 'VUS', 'LPV', 'PV', 'Mosaic')
+  gene.test.full <- c('True Negative','Uniformative negative','VUS',
+                      'Likely pathogenic','Pathogetnic','Suspected Mosaic')
+  replace(gene.testing, gene.testing %in% gene.test.full, 
+          gene.abbrev[na.omit(match(gene.testing, gene.test.full))])
+}
 
