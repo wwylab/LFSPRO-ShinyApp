@@ -28,6 +28,7 @@ sketch = htmltools::withTags(table(
       th(rowspan = 3, 'Details'),
       th(rowspan = 3, 'ID'),
       th(rowspan = 3, "Info"),
+      th(rowspan = 3, 'Gene Testing')
       th(rowspan = 3, 'ProbLFSPRO'),
       th(rowspan = 3, 'LFSPRO-carrier'),
       th(rowspan = 3, 'Chompret criteria'),
@@ -67,7 +68,7 @@ shinyServer(function(input, output) {
     if (is.null(infile)){
       return(NULL)      
     }
-    read.csv(infile$datapath, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+    read.csv(infile$datapath, header = TRUE, sep = ",", stringsAsFactors = FALSE, fileEncoding="UTF-8-BOM")
   })
   
   cancerdata <- reactive({
@@ -75,7 +76,7 @@ shinyServer(function(input, output) {
     if (is.null(infile)){
       return(NULL)      
     }
-    read.csv(infile$datapath, header = TRUE, sep = ",", stringsAsFactors = FALSE)
+   read.csv(infile$datapath, header = TRUE, sep = ",", stringsAsFactors = FALSE, fileEncoding="UTF-8-BOM")
   })
   
   cid <- reactive({
@@ -106,6 +107,7 @@ shinyServer(function(input, output) {
           if (is.null(fam.data)) return(NULL)
           cancer.data <- cancerdata()
           if (is.null(cancer.data)) return(NULL)
+          fam.data <- fam.update(fam.data, cancer.data)
           fam.data <- dummy.create(fam.data.process(fam.data, cancer.data))
           cancer.data <- cancer.data.process(fam.data, cancer.data)
           
@@ -146,6 +148,7 @@ shinyServer(function(input, output) {
             if (is.null(fam.data)) return(NULL)
             cancer.data <- cancerdata()
             if (is.null(cancer.data)) return(NULL)
+            fam.data <- fam.update(fam.data, cancer.data)
             fam.data <- dummy.create(fam.data.process(fam.data, cancer.data))
             cancer.data <- cancer.data.process(fam.data, cancer.data)
             
@@ -174,46 +177,63 @@ shinyServer(function(input, output) {
               counselee.id <- data.frame(fam.id = "fam", id = cid)
             }
             
-            ## patients are removed with age >= 80 or dead
-            id.rm <- fam.data$id[fam.data$age >= 80 | fam.data$vital == "D"]
-            counselee.id <- counselee.id[!(counselee.id$id %in% id.rm),]
-            
+            ## deceased patients are marked
+            id.dead <- fam.data$id[fam.data$vital == "D"]
+            counselee.dead <- counselee.id[counselee.id$id %in% id.dead,]
+            counselee.alive <- counselee.id[!counselee.id$id %in% id.dead,]
+            idx.dead <- counselee.id$id %in% id.dead
+              
             info <- NULL
             for(i in 1:length(counselee.id$id)){
               id <- counselee.id$id[i]
               idx.can <- which(cancer.data$id == id)
-              idx.fam <- which(fam.data$id == id)
+              idx.fam <- which(fam.data$id == id) 
               if (fam.data$dummy[idx.fam] == 0) {
                 info.tmp <- ""
               } else {
                 info.tmp <- "DUMMY; "
               }
+              if (fam.data$vital[idx.fam] == 'D')
+              {
+                info.tmp <- paste0(info.tmp,'Deceased; Was ')
+              }
               info.tmp <- paste0(info.tmp, fam.data$age[idx.fam], " years old ")
-              info.tmp <- paste0(info.tmp, ifelse(fam.data$gender[idx.fam]==0, "female; ", "male; "))
+              info.tmp <- paste0(info.tmp, ifelse(fam.data$gender[idx.fam] == 0, "female; ", "male; "))
+              if (fam.data$gene.testing[idx.fam] != ''){
+                info.tmp <- paste0(info.tmp, ifelse(fam.data$gender[idx.fam] == 0, "Her ", "His "))
+                info.tmp <- paste0(info.tmp, 'confirmed genetic testing result is ', fam.data$gene.testing[idx.fam], '; ')
+              }
               if(length(idx.can)){
                 for(j in idx.can){
                   info.tmp <- paste0(info.tmp, cancer.data$cancer.type[j], " at age ", cancer.data$diag.age[j], "; ")
                 }
-                info <- c(info, info.tmp)
               } else {
-                info <- c(info, paste0(info.tmp, "No Cancer"))
+                info.tmp <- paste0(info.tmp, "No Cancer. ")
               }
+              info <- c(info, info.tmp)
             }
             
-            rltTmp <- runLFSPRO(fam.data, cancer.data, counselee.id)
+            # run LFSPRO on all selected patients
+            temp.fam.data<- fam.data
+            temp.fam.data$vital <- 'A'
+            
+            rltTmp <- runLFSPRO(temp.fam.data, cancer.data, counselee.id)
+            rltTmp[,6:ncol(rltTmp)][idx.dead,] <- NA
             rltTmp$info <- info
+            rltTmp <- merge(rltTmp, subset(fam.data, select = c(id, vital, age)))
             LFSPRO.rlt <<- rltTmp
             
             rlt <- data.frame(
-              id = factor(LFSPRO.rlt$id, levels =  LFSPRO.rlt$id),
-              info = info, 
+              id =factor(LFSPRO.rlt$id, levels = LFSPRO.rlt$id),
+              info = LFSPRO.rlt$info,
+              gene.testing = fam.genelevel(LFSPRO.rlt$gene.testing),
               ProbLFSPRO = LFSPRO.rlt$carrier,
               LFSPRO = factor(ifelse(LFSPRO.rlt$carrier>cutoff, "Yes", "No"), 
-                              levels = c("Yes", "No")),
+                            levels = c("Yes", "No")),
               Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
-                                levels = c("Yes", "No")),
+                              levels = c("Yes", "No")),
               Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
-                               levels = c("Yes", "No")),
+                             levels = c("Yes", "No"))
               breast.5 = LFSPRO.rlt$breast.5,
               breast.10 = LFSPRO.rlt$breast.10,
               breast.15 = LFSPRO.rlt$breast.15,
@@ -233,8 +253,7 @@ shinyServer(function(input, output) {
                 label = "Risk Trend",
                 onclick = 'Shiny.onInputChange(\"lastClick\",  this.id)'
               )
-            )
-            
+            )            
             rlt <- cbind('Details' = '&oplus;', rlt)
             rlt
           })
@@ -305,7 +324,8 @@ shinyServer(function(input, output) {
         isolate({
           rlt <- data.frame(
             id = factor(LFSPRO.rlt$id, levels =  LFSPRO.rlt$id),
-            info = LFSPRO.rlt$info, 
+            info = LFSPRO.rlt$info,
+            gene.testing = fam.genelevel(LFSPRO.rlt$gene.testing),
             ProbLFSPRO = LFSPRO.rlt$carrier,
             LFSPRO = factor(ifelse(LFSPRO.rlt$carrier>cutoff, "Yes", "No"), 
                             levels = c("Yes", "No")),
@@ -397,6 +417,8 @@ shinyServer(function(input, output) {
     idx.button <- myValue$idx.button
     id.sel <- LFSPRO.rlt$id[idx.button]
     fam.data <- famdata()
+    cancer.data <- cancerdata()
+    fam.data <- fam.update(fam.data, cancer.data)
     idx.sel <- which(fam.data$id == id.sel)
     rlt <- paste0(
       "Sample id: ", id.sel,  "\n",
@@ -438,11 +460,28 @@ shinyServer(function(input, output) {
       
       stringsAsFactors = FALSE
     )
-    idx.rm.col <- colSums(is.na(dplot)) == 0
+    Second.check <- sum(is.na(c(dplot$Second, dplot$Breast, dplot$Sarcoma, dplot$Other)))==12
+    idx.rm.col <- colSums(!is.na(dplot)) > 0
     dplot <- dplot[,idx.rm.col]
+    
     if(is.null(ncol(dplot))){
-      return(NULL)
+        text <- ''
+        
+        if(LFSPRO.rlt$vital[idx.button] == 'D'){
+        text = paste("This individual is deceased and is not applicable \n for future cancer risk prediction.")
+        } else if(LFSPRO.rlt$age[idx.button] >= 80){
+        text = paste("At this time, LFSPRO has not been validated to \n",
+                     "provide a risk prediction over the age of 80 years.")
+        } else if(Second.check){
+        text = paste("At this time, LFSPRO has not been validated to \n",
+                     "provide a risk prediction past a second primary cancer.")
+        }
+        
+        gp <- ggplot() + 
+          annotate("text", x = 4, y = 25, size=6, label = text) + theme_void()
+        return(gp)
     }
+
     
     dplot.pop <- data.frame(
       year = c(5, 10, 15),
@@ -459,13 +498,28 @@ shinyServer(function(input, output) {
       stringsAsFactors = FALSE
     )
     
-    idx.rm.col <- colSums(is.na(dplot.pop)) == 0
+    Second.check <- sum(is.na(c(dplot$Second, dplot$Breast, dplot$Sarcoma, dplot$Other)))==12
+    idx.rm.col <- colSums(!is.na(dplot.pop)) > 0
     dplot.pop <- dplot.pop[,idx.rm.col]
-    if(is.null(ncol(dplot.pop))){
-      return(NULL)
+    if(is.null(ncol(dplot.pop))| LFSPRO.rlt$vital[idx.button] == 'D'){
+      text <- ''
+      
+      if(LFSPRO.rlt$vital[idx.button] == 'D'){
+        text = paste("This individual is deceased and is not applicable \n for future cancer risk prediction.")
+      } else if(LFSPRO.rlt$age[idx.button] >= 80){
+        text = paste("At this time, LFSPRO has not been validated to \n",
+                     "provide a risk prediction over the age of 80 years.\n")
+      } else if(Second.check){
+        text = paste("At this time, LFSPRO has not been validated to \n",
+                     "provide a risk prediction past a second primary cancer.\n")
+      }
+      gp <- ggplot() + 
+        annotate("text", x = 4, y = 25, size=6, label = text) + theme_void()
+      return(gp)
     }
     
     dplot.2 <- reshape2::melt(dplot, id.vars = "year", variable.name = "type", value.name = "risk")
+    dplot.2$risk[is.na(dplot.2$risk)] <- 0
     dplot.2$risk_per <- 100 * dplot.2$risk
     dplot.2$risk_per2 <- round(dplot.2$risk_per, 3)
     dplot.2$year <- factor(dplot.2$year)
@@ -473,6 +527,7 @@ shinyServer(function(input, output) {
     dplot.2$pop <- factor(0)
     
     dplot.pop.2 <- reshape2::melt(dplot.pop, id.vars = "year", variable.name = "type", value.name = "risk")
+    dplot.pop.2$risk[is.na(dplot.pop.2$risk)] <- 0
     dplot.pop.2$risk_per <- 100 * dplot.pop.2$risk
     dplot.pop.2$year <- factor(dplot.pop.2$year)
     levels(dplot.pop.2$year) <- c("5yr", "10yr", "15yr")
