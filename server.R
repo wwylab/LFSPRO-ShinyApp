@@ -29,8 +29,10 @@ sketch = htmltools::withTags(table(
       th(rowspan = 3, 'ID'),
       th(rowspan = 3, "Info"),
       th(rowspan = 3, 'Gene Testing'),
-      th(rowspan = 3, 'ProbLFSPRO'),
-      th(rowspan = 3, 'LFSPRO-carrier'),
+      th(rowspan = 3, 'ProbLFSPRO.mpc'),
+      th(rowspan = 3, 'ProbLFSPRO.cs'),
+      th(rowspan = 3, 'LFSPRO-mpc-carrier'),
+      th(rowspan = 3, 'LFSPRO-cs-carrier'),
       th(rowspan = 3, 'Chompret criteria'),
       th(rowspan = 3, 'Classic criteria'),
       th(colspan = 13, 'Cancer Risk')
@@ -218,7 +220,7 @@ shinyServer(function(input, output) {
             temp.fam.data$vital <- 'A'
             
             rltTmp <- runLFSPRO(temp.fam.data, cancer.data, counselee.id)
-            rltTmp[,6:ncol(rltTmp)][idx.dead,] <- NA
+            rltTmp[,7:ncol(rltTmp)][idx.dead,] <- NA
             rltTmp$info <- info
             rltTmp <- merge(rltTmp, subset(fam.data, select = c(id, vital, age)))
             LFSPRO.rlt <<- rltTmp
@@ -227,9 +229,12 @@ shinyServer(function(input, output) {
               id =factor(LFSPRO.rlt$id, levels = LFSPRO.rlt$id),
               info = LFSPRO.rlt$info,
               gene.testing = fam.genelevel(LFSPRO.rlt$gene.testing),
-              ProbLFSPRO = LFSPRO.rlt$carrier,
-              LFSPRO = factor(ifelse(LFSPRO.rlt$carrier>cutoff, "Yes", "No"), 
-                            levels = c("Yes", "No")),
+              ProbLFSPRO.mpc = LFSPRO.rlt$carrier.mpc,
+              ProbLFSPRO.cs = LFSPRO.rlt$carrier.cs,
+              LFSPRO.mpc = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
+                                  levels = c("Yes", "No")),
+              LFSPRO.cs = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
+                                 levels = c("Yes", "No")),
               Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
                               levels = c("Yes", "No")),
               Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
@@ -285,11 +290,12 @@ shinyServer(function(input, output) {
         });
         "
         )) %>% 
-          DT::formatRound('ProbLFSPRO', 2) %>%
+          DT::formatRound('ProbLFSPRO.mpc', 2) %>%
+          DT::formatRound('ProbLFSPRO.cs', 2) %>%
           DT::formatRound(
             c("breast.5", "breast.10", "breast.15", "sarcoma.5", "sarcoma.10", "sarcoma.15", 
               "other.5", "other.10", "other.15", "second.5", "second.10", "second.15"), 2) %>%
-          formatStyle(c('LFSPRO', 'Chompret', 'Classic'),
+          formatStyle(c('LFSPRO.mpc', 'LFSPRO.cs', 'Chompret', 'Classic'),
                       color = styleEqual("Yes", 'red'))
       })
     }
@@ -326,9 +332,12 @@ shinyServer(function(input, output) {
             id = factor(LFSPRO.rlt$id, levels =  LFSPRO.rlt$id),
             info = LFSPRO.rlt$info,
             gene.testing = fam.genelevel(LFSPRO.rlt$gene.testing),
-            ProbLFSPRO = LFSPRO.rlt$carrier,
-            LFSPRO = factor(ifelse(LFSPRO.rlt$carrier>cutoff, "Yes", "No"), 
-                            levels = c("Yes", "No")),
+            ProbLFSPRO.mpc = LFSPRO.rlt$carrier.mpc,
+            ProbLFSPRO.cs = LFSPRO.rlt$carrier.cs,
+            LFSPRO.mpc = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
+                                levels = c("Yes", "No")),
+            LFSPRO.cs = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
+                               levels = c("Yes", "No")),
             Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
                               levels = c("Yes", "No")),
             Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
@@ -385,11 +394,12 @@ shinyServer(function(input, output) {
         });
         "
       )) %>% 
-        DT::formatRound('ProbLFSPRO', 2) %>%
+        DT::formatRound('ProbLFSPRO.mpc', 2) %>%
+        DT::formatRound('ProbLFSPRO.cs', 2) %>%
         DT::formatRound(
           c("breast.5", "breast.10", "breast.15", "sarcoma.5", "sarcoma.10", "sarcoma.15", 
             "other.5", "other.10", "other.15", "second.5", "second.10", "second.15"), 2) %>%
-        formatStyle(c('LFSPRO', 'Chompret', 'Classic'),
+        formatStyle(c('LFSPRO.mpc', 'LFSPRO.cs', 'Chompret', 'Classic'),
                     color = styleEqual("Yes", 'red'))
     })
   })

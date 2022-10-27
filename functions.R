@@ -9,7 +9,8 @@ format.pv <- function(pv){
 runLFSPRO <- function(fam.data, cancer.data, counselee.id){
   rlt.classic <- lfsClassic(fam.data, cancer.data, counselee.id)
   rlt.chompret <- lfsChompret2015(fam.data, cancer.data, counselee.id)
-  rlt.lfspro <- lfspro(fam.data, cancer.data, counselee.id)
+  rlt.lfspro <- lfspro(fam.data, cancer.data, counselee.id,method="MPC")
+  rlt.lfspro.cs <- lfspro(fam.data, cancer.data, counselee.id,method="CS")
   rlt.lfspro.pop <- lfspro.pop(fam.data, cancer.data, counselee.id)
   
   cs.id <- rlt.lfspro$Cancer_specific_risks$Breast_risks$counselee.id
@@ -24,7 +25,8 @@ runLFSPRO <- function(fam.data, cancer.data, counselee.id){
     gene.testing = fam.data[fam.data$id %in% counselee.id$id,]$gene.testing,
     classic = rlt.classic$result,
     chompret = rlt.chompret$result,
-    carrier = rlt.lfspro$Mutation_probability$mutation_probability,
+    carrier.mpc = rlt.lfspro$Mutation_probability$mutation_probability,
+    carrier.cs = rlt.lfspro.cs$Mutation_probability$mutation_probability,
     
     breast.5 = replace(risk, cs.idx, rlt.lfspro$Cancer_specific_risks$Breast_risks$`breast in 5 yrs`),
     breast.10 = replace(risk, cs.idx, rlt.lfspro$Cancer_specific_risks$Breast_risks$`breast in 10 yrs`),
