@@ -6,11 +6,13 @@ format.pv <- function(pv){
   }
 }
 
-runLFSPRO <- function(fam.data, cancer.data, counselee.id){
+runLFSPRO <- function(fam.data, cancer.data, counselee.id, mut.info){
   rlt.classic <- lfsClassic(fam.data, cancer.data, counselee.id)
   rlt.chompret <- lfsChompret2015(fam.data, cancer.data, counselee.id)
-  rlt.lfspro <- lfspro(fam.data, cancer.data, counselee.id,method="MPC")
-  rlt.lfspro.cs <- lfspro(fam.data, cancer.data, counselee.id,method="CS")
+  rlt.lfspro <- lfspro(fam.data, cancer.data, counselee.id,
+                       method="MPC",mut.info=mut.info)
+  rlt.lfspro.cs <- lfspro(fam.data, cancer.data, counselee.id,method="CS",
+                          mut.info=mut.info)
   rlt.lfspro.pop <- lfspro.pop(fam.data, cancer.data, counselee.id)
   
   cs.id <- rlt.lfspro$Cancer_specific_risks$Breast_risks$counselee.id
@@ -22,7 +24,7 @@ runLFSPRO <- function(fam.data, cancer.data, counselee.id){
   
   rlt <- data.frame(
     id = counselee.id$id,
-    gene.testing = fam.data[fam.data$id %in% counselee.id$id,]$gene.testing,
+    test = fam.data[fam.data$id %in% counselee.id$id,]$test,
     classic = rlt.classic$result,
     chompret = rlt.chompret$result,
     carrier.mpc = rlt.lfspro$Mutation_probability$mutation_probability,
@@ -67,7 +69,6 @@ runLFSPRO <- function(fam.data, cancer.data, counselee.id){
 
 dummy.create <- function(fam.data) {
   fam <- fam.data
-  
   id <- fam$id 
   fid <- fam$fid
   fid[fid == 0] <- NA
@@ -75,7 +76,7 @@ dummy.create <- function(fam.data) {
   mid[mid == 0] <- NA
   gender <- fam$gender
   age <- fam$age
-  gene.testing <- fam$gene.testing
+  test <- fam$test
   vital <- fam$vital
   proband <- fam$proband
   dummy <- rep(0, length(id))
@@ -87,7 +88,7 @@ dummy.create <- function(fam.data) {
   mid <- c(mid, rep(NA, n))
   gender <- c(gender, rep(1, n))
   age <- c(age, rep(1, n))
-  gene.testing <- c(gene.testing, rep(NA, n))
+  test <- c(test, rep(NA, n))
   vital <- c(vital, rep('A', n))
   proband <- c(proband, rep('N', n))
   dummy <- c(dummy, rep(1, n))
@@ -99,7 +100,7 @@ dummy.create <- function(fam.data) {
   mid <- c(mid, rep(NA, n))
   gender <- c(gender, rep(0, n))
   age <- c(age, rep(1, n))
-  gene.testing <- c(gene.testing, rep(NA, n))
+  test <- c(test, rep(NA, n))
   vital <- c(vital, rep('A', n))
   proband <- c(proband, rep('N', n))
   dummy <- c(dummy, rep(1, n))
@@ -138,13 +139,13 @@ dummy.create <- function(fam.data) {
       fid <- c(fid, NA)
       mid <- c(mid, NA)
       age <- c(age, 1)
-      gene.testing <- c(gene.testing, NA)
+      test <- c(test, NA)
       vital <- c(vital, 'A')
       proband <- c(proband, 'N')
       dummy <- c(dummy, 1)
     }
   }
-  fam <- data.frame(id, fid, mid, gender, age, gene.testing, vital, proband, dummy)
+  fam <- data.frame(id, fid, mid, gender, age, test, vital, proband, dummy)
   return(fam)
 }
 
@@ -285,13 +286,11 @@ cancer.data.process <- function(fam.data, cancer.data) {
   return(cancer.data)
 }
 
-lfspro.pop <- function(fam.data, cancer.data, counselee.id, penetrance.all=NULL,
+lfspro.pop <- function(fam.data, cancer.data, counselee.id,
                        allef=list(c(0.9994,0.0006)), nloci=1, mRate=0.00012){
   fam.data <- fam.data[order(fam.data$fam.id, fam.data$id),]
   cancer.data <- cancer.data[order(cancer.data$fam.id, cancer.data$id),]
-  
   num.cancer <- nrow(cancer.data) 
-  cancer.type.num <- rep(-1, num.cancer)
   colnames(counselee.id) <- c("fam.id", "id")
   
   for(i in 1:num.cancer){
@@ -310,10 +309,11 @@ lfspro.pop <- function(fam.data, cancer.data, counselee.id, penetrance.all=NULL,
       colnames(rlt) <- c("fam.id", "id", "pp")
       return(rlt)
     }
-    cancer.type.num[i] <- tmp
   }
-  cancer.data$cancer.type <- cancer.type.num
   fam.cancer.data <- combinedata(fam.data, cancer.data)
+  data.obj <- convert.data(fam.cancer.data)
+  data.obj1 <- data.obj[[1]]
+  data.obj2 <- data.obj[[2]]
   
   num.fam <- length(fam.cancer.data)
   risk.mpc.output <- NULL
@@ -347,14 +347,8 @@ lfspro.pop <- function(fam.data, cancer.data, counselee.id, penetrance.all=NULL,
     }
     
     ## Carrier probability calculation with MPC
-    if (is.null(penetrance.all)){
-      penetrance.all = parameter.mpc
-    }
-    data.obj <- convert.data(fam.cancer.data)
-    data.obj1 <- data.obj[[1]]
-    data.obj2 <- data.obj[[2]]
-    pp.tmp <- lfsproC.mpc(fam.cancer.data[[i]], penetrance.all, data.obj1[[i]],
-                          data.obj2[[i]], cid, allef, nloci, mRate) 
+    pp.tmp <- lfsproC.mpc(data.obj1[[i]], data.obj2[[i]], cid, 
+                          parameter.mpc, allef, nloci, mRate, mut.info = FALSE) 
     pp.tmp[,1] <- 1
     pp.tmp[,2] <- 0
     pp.tmp[,3] <- 0
@@ -384,7 +378,7 @@ lfspro.pop <- function(fam.data, cancer.data, counselee.id, penetrance.all=NULL,
     }
     
     if (length(cid.1)>0){
-      risk.mpc.temp <- risk.mpc(fam.cancer.data[[i]], cid.1, penetrance.all)
+      risk.mpc.temp <- risk.mpc(fam.cancer.data[[i]], cid.1, parameter.mpc)
       risk.mpc.output <- data.frame(risk.mpc.temp, stringsAsFactors = F)
       colnames(risk.mpc.output) <- c("fam.id", "id", "age", "gender", "first.cancer",
                                      "5 years (wildtype)", "10 years(wildtype)", "15 years (wildtype)", 
@@ -422,17 +416,16 @@ fam.update <- function(fam.data, cancer.data){
       }
     }
   }
-  if (!("gene.testing" %in% colnames(fam.data))) {
-    fam.data$gene.testing <- ""
+  if (!("test" %in% colnames(fam.data))) {
+    fam.data$test <- ""
   }
   return(fam.data)
 }
 
-fam.genelevel <- function(gene.testing){
+fam.genelevel <- function(test){
   gene.abbrev <- c('TN', 'UN', 'VUS', 'LPV', 'PV', 'Mosaic')
   gene.test.full <- c('True Negative','Uniformative negative','VUS',
                       'Likely pathogenic','Pathogetnic','Suspected Mosaic')
-  replace(gene.testing, gene.testing %in% gene.test.full, 
-          gene.abbrev[na.omit(match(gene.testing, gene.test.full))])
+  replace(test, test %in% gene.test.full, 
+          gene.abbrev[na.omit(match(test, gene.test.full))])
 }
-
