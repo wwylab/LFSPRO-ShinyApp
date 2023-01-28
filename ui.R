@@ -51,7 +51,8 @@ shinyUI(
         uiOutput('ui.action'),
         
         hr(),
-        uiOutput("ui.cutoff")
+        uiOutput("ui.cutoff"),
+        uiOutput("ui.mutation")
       ),
       
       # Show a plot of the generated distribution
