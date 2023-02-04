@@ -51,13 +51,16 @@ shinyUI(
         uiOutput('ui.action'),
         
         hr(),
-        uiOutput("ui.cutoff"),
-        uiOutput("ui.mutation")
+        uiOutput("ui.mutation"),
+        br(),
+        uiOutput("ui.cutoff")
       ),
       
       # Show a plot of the generated distribution
       mainPanel(
         fluidRow(plotOutput("distPlot")),
+        span(textOutput("warning"), style="color:red"),
+        br(),
         fluidRow(verbatimTextOutput("sInfo")),
         fluidRow(DT::dataTableOutput("table")),
         fluidRow(column(12, align="center",
