@@ -9,16 +9,6 @@ library(ggplot2)
 library(ggsci)
 library(LFSPRO)
 
-source("functions.R")
-sourceDir <- function(path, trace = TRUE, ...) {
-  for (nm in list.files(path, pattern = "[.][RrSsQq]$")) {
-    if(trace) cat(nm,":")
-    source(file.path(path, nm), ...)
-    if(trace) cat("\n")
-  }
-}
-sourceDir("R")
-
 #Style
 sketch = htmltools::withTags(table(
   class = 'display',
@@ -125,6 +115,10 @@ shinyServer(function(input, output) {
           pedSel <- ped["fam"]
           id2 <- pedSel$id
           id2[fam.data$proband == "Y"] <- paste(id2[fam.data$proband == "Y"], "Proband", sep = "\n")
+          mut <- !is.na(fam.data$test) & (fam.data$test == 1)
+          id2[mut] <- paste(id2[mut], "Mut", sep = "\n")
+          wt <- !is.na(fam.data$test) & (fam.data$test == 0)
+          id2[wt] <- paste(id2[wt], "WT", sep = "\n")
           col.label <- c("Unaffected")
           if (sum(fam.data$proband == "Y") > 0) {
             col.label <- c(col.label, "Proband")
@@ -137,6 +131,33 @@ shinyServer(function(input, output) {
                      col = ifelse(fam.data$dummy == 0, ifelse(fam.data$proband == "Y", "red", "black"), "blue"),
                      col.label = col.label, id = id2)
           
+        })
+      })
+      
+      output$warning <- renderText({
+        if (is.null(input$action)) return()
+        if (input$action==0) return()
+        isolate({
+          fam.data <- famdata()
+          if (is.null(fam.data)) return(NULL)
+          cancer.data <- cancerdata()
+          if (is.null(cancer.data)) return(NULL)
+          id.test <- fam.data$id[!is.na(fam.data$test)]
+          id.cancer <- unique(cancer.data$id)
+          non.informative <- FALSE
+          if ((length(id.test) <= 1) & (length(id.cancer) <= 1)) {
+            if ((length(id.test) == 1) & (length(id.cancer) == 1)) {
+              non.informative <- (id.test[1] == id.cancer[1])
+            } else {
+              non.informative <- TRUE
+            }
+          }
+          if (non.informative) {
+            warning <- "Warning: This family has limited information; The predicted risks can be unreliable."
+          } else {
+            warning <- ""
+          }
+          warning
         })
       })
       
