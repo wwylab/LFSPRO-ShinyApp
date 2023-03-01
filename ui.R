@@ -4,7 +4,7 @@ shinyUI(
   fluidPage(
     includeCSS("style.css"),
     # Application title
-    titlePanel("Predict future cancer risk for families with Li-Fraumeni syndrome"),
+    titlePanel("Predicting mutation carrier status and future cancer risk for families with Li-Fraumeni syndrome"),
     
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
