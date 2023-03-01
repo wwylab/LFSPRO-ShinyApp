@@ -17,7 +17,6 @@ sourceDir <- function(path, trace = TRUE, ...) {
     if(trace) cat("\n")
   }
 }
-sourceDir("R")
 
 #Style
 sketch = htmltools::withTags(table(
