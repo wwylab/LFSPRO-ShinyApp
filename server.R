@@ -128,18 +128,11 @@ shinyServer(function(input, output) {
           id2[mut] <- paste(id2[mut], "Mut", sep = "\n")
           wt <- !is.na(fam.data$test) & (fam.data$test == 0)
           id2[wt] <- paste(id2[wt], "WT", sep = "\n")
-          col.label <- c("Unaffected")
-          if (sum(fam.data$proband == "Y") > 0) {
-            col.label <- c(col.label, "Proband")
-          }
-          if (sum(fam.data$dummy == 1) > 0) {
-            col.label <- c(col.label, "Dummy")
-          }
-          legendPlot(pedSel,
-                     affected.label = c("Affected"),
+          col.label <- c("Unaffected", "Proband", "Dummy")
+          names(col.label) <- c("black", "red", "blue")
+          legendPlot(pedSel, affected.label = c("Affected"),
                      col = ifelse(fam.data$dummy == 0, ifelse(fam.data$proband == "Y", "red", "black"), "blue"),
                      col.label = col.label, id = id2)
-          
         })
       })
       
