@@ -3,8 +3,6 @@ R code of LFSPRO online.
 The live code is hosted [here](https://gangpeng.shinyapps.io/LFSPRO/)
 
 ## Link to LFSPRO package
-[LFSPRO](https://github.com/wwylab/LFSPRO)
-
 [LFSPRO Github](https://github.com/wwylab/LFSPRO)
 
 ## Reference
