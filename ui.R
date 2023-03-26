@@ -53,6 +53,8 @@ shinyUI(
         hr(),
         uiOutput("ui.mutation"),
         br(),
+        uiOutput("ui.model"),
+        br(),
         uiOutput("ui.cutoff")
       ),
       
