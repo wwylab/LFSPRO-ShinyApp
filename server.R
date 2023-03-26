@@ -28,10 +28,8 @@ sketch = htmltools::withTags(table(
       th(rowspan = 3, 'ID'),
       th(rowspan = 3, "Info"),
       th(rowspan = 3, 'Gene Testing'),
-      th(rowspan = 3, 'ProbLFSPRO.mpc'),
-      th(rowspan = 3, 'ProbLFSPRO.cs'),
-      th(rowspan = 3, 'LFSPRO-mpc-carrier'),
-      th(rowspan = 3, 'LFSPRO-cs-carrier'),
+      th(rowspan = 3, 'ProbLFSPRO'),
+      th(rowspan = 3, 'LFSPRO-carrier'),
       th(rowspan = 3, 'Chompret criteria'),
       th(rowspan = 3, 'Classic criteria'),
       th(colspan = 13, 'Cancer Risk')
@@ -49,8 +47,9 @@ sketch = htmltools::withTags(table(
   )
 ))
 
-
 cutoff <- 0.2
+use.mutation <- TRUE
+use.CS <- FALSE
 
 shinyServer(function(input, output) {
   LFSPRO.rlt <- NULL
@@ -242,22 +241,28 @@ shinyServer(function(input, output) {
             temp.fam.data <- fam.data
             temp.fam.data$vital <- 'A'
             
-            rltTmp <- runLFSPRO(temp.fam.data, cancer.data, counselee.id, mut.info = TRUE)
+            rltTmp <- runLFSPRO(temp.fam.data, cancer.data, counselee.id, mut.info = use.mutation)
             rltTmp[,7:ncol(rltTmp)][idx.dead,] <- NA
             rltTmp$info <- info
             rltTmp <- merge(rltTmp, subset(fam.data, select = c(id, vital, age)))
             LFSPRO.rlt <<- rltTmp
             
+            if (use.CS == TRUE) {
+              ProbLFSPRO = LFSPRO.rlt$carrier.cs
+              LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
+                              levels = c("Yes", "No"))
+            } else {
+              ProbLFSPRO = LFSPRO.rlt$carrier.mpc
+              LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
+                              levels = c("Yes", "No"))
+            }
+            
             rlt <- data.frame(
-              id =factor(LFSPRO.rlt$id, levels = LFSPRO.rlt$id),
+              id = factor(LFSPRO.rlt$id, levels = LFSPRO.rlt$id),
               info = LFSPRO.rlt$info,
               test = fam.genelevel(LFSPRO.rlt$test),
-              ProbLFSPRO.mpc = LFSPRO.rlt$carrier.mpc,
-              ProbLFSPRO.cs = LFSPRO.rlt$carrier.cs,
-              LFSPRO.mpc = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
-                                  levels = c("Yes", "No")),
-              LFSPRO.cs = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
-                                 levels = c("Yes", "No")),
+              ProbLFSPRO = ProbLFSPRO,
+              LFSPRO = LFSPRO,
               Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
                                 levels = c("Yes", "No")),
               Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
@@ -313,13 +318,11 @@ shinyServer(function(input, output) {
         });
         "
         )) %>% 
-          DT::formatRound('ProbLFSPRO.mpc', 2) %>%
-          DT::formatRound('ProbLFSPRO.cs', 2) %>%
+          DT::formatRound('ProbLFSPRO', 2) %>%
           DT::formatRound(
             c("breast.5", "breast.10", "breast.15", "sarcoma.5", "sarcoma.10", "sarcoma.15", 
               "other.5", "other.10", "other.15", "second.5", "second.10", "second.15"), 2) %>%
-          formatStyle(c('LFSPRO.mpc', 'LFSPRO.cs', 'Chompret', 'Classic'),
-                      color = styleEqual("Yes", 'red'))
+          formatStyle(c('LFSPRO', 'Chompret', 'Classic'), color = styleEqual("Yes", 'red'))
       })
     }
   )
@@ -340,6 +343,14 @@ shinyServer(function(input, output) {
                  choices = c("Yes","No"), selected = "Yes", inline = TRUE)
   })
   
+  output$ui.model <- renderUI({
+    if (is.null(input$action) ) return()
+    if (input$action==0) return()
+    
+    radioButtons("model", "Which model do you want to use to calculate carrier probability?", 
+                 choices = c("MPC","CS"), selected = "MPC", inline = TRUE)
+  })
+  
   output$download <- downloadHandler('LFSPRO.csv', content = function(file) {
     write.csv(LFSPRO.rlt, file, row.names = FALSE)
   })
@@ -357,18 +368,24 @@ shinyServer(function(input, output) {
       if (is.null(input$action)) return(DT::datatable(NULL))
       if (input$action==0) return(DT::datatable(NULL))
       
+      if (use.CS == TRUE) {
+        ProbLFSPRO = LFSPRO.rlt$carrier.cs
+        LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
+                        levels = c("Yes", "No"))
+      } else {
+        ProbLFSPRO = LFSPRO.rlt$carrier.mpc
+        LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
+                        levels = c("Yes", "No"))
+      }
+      
       DT::datatable({
         isolate({
           rlt <- data.frame(
             id = factor(LFSPRO.rlt$id, levels =  LFSPRO.rlt$id),
             info = LFSPRO.rlt$info,
             test = fam.genelevel(LFSPRO.rlt$test),
-            ProbLFSPRO.mpc = LFSPRO.rlt$carrier.mpc,
-            ProbLFSPRO.cs = LFSPRO.rlt$carrier.cs,
-            LFSPRO.mpc = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
-                                levels = c("Yes", "No")),
-            LFSPRO.cs = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
-                               levels = c("Yes", "No")),
+            ProbLFSPRO = ProbLFSPRO,
+            LFSPRO = LFSPRO,
             Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
                               levels = c("Yes", "No")),
             Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
@@ -425,19 +442,16 @@ shinyServer(function(input, output) {
         });
         "
       )) %>% 
-        DT::formatRound('ProbLFSPRO.mpc', 2) %>%
-        DT::formatRound('ProbLFSPRO.cs', 2) %>%
+        DT::formatRound('ProbLFSPRO', 2) %>%
         DT::formatRound(
           c("breast.5", "breast.10", "breast.15", "sarcoma.5", "sarcoma.10", "sarcoma.15", 
             "other.5", "other.10", "other.15", "second.5", "second.10", "second.15"), 2) %>%
-        formatStyle(c('LFSPRO.mpc', 'LFSPRO.cs', 'Chompret', 'Classic'),
-                    color = styleEqual("Yes", 'red'))
+        formatStyle(c('LFSPRO', 'Chompret', 'Classic'), color = styleEqual("Yes", 'red'))
     })
   })
   
   observeEvent(eventExpr = input$mutation, handlerExpr = {
-    mutation <<- input$mutation
-    use.mutation <- (mutation == "Yes")
+    use.mutation <<- (input$mutation == "Yes")
     
     output$table <- DT::renderDataTable({
       if (is.null(input$action)) return(DT::datatable(NULL))
@@ -524,16 +538,22 @@ shinyServer(function(input, output) {
           rltTmp <- merge(rltTmp, subset(fam.data, select = c(id, vital, age)))
           LFSPRO.rlt <<- rltTmp
           
+          if (use.CS == TRUE) {
+            ProbLFSPRO = LFSPRO.rlt$carrier.cs
+            LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
+                            levels = c("Yes", "No"))
+          } else {
+            ProbLFSPRO = LFSPRO.rlt$carrier.mpc
+            LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
+                            levels = c("Yes", "No"))
+          }
+          
           rlt <- data.frame(
             id = factor(LFSPRO.rlt$id, levels =  LFSPRO.rlt$id),
             info = LFSPRO.rlt$info,
             test = fam.genelevel(LFSPRO.rlt$test),
-            ProbLFSPRO.mpc = LFSPRO.rlt$carrier.mpc,
-            ProbLFSPRO.cs = LFSPRO.rlt$carrier.cs,
-            LFSPRO.mpc = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
-                                levels = c("Yes", "No")),
-            LFSPRO.cs = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
-                               levels = c("Yes", "No")),
+            ProbLFSPRO = ProbLFSPRO,
+            LFSPRO = LFSPRO,
             Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
                               levels = c("Yes", "No")),
             Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
@@ -590,13 +610,179 @@ shinyServer(function(input, output) {
         });
         "
       )) %>% 
-        DT::formatRound('ProbLFSPRO.mpc', 2) %>%
-        DT::formatRound('ProbLFSPRO.cs', 2) %>%
+        DT::formatRound('ProbLFSPRO', 2) %>%
         DT::formatRound(
           c("breast.5", "breast.10", "breast.15", "sarcoma.5", "sarcoma.10", "sarcoma.15", 
             "other.5", "other.10", "other.15", "second.5", "second.10", "second.15"), 2) %>%
-        formatStyle(c('LFSPRO.mpc', 'LFSPRO.cs', 'Chompret', 'Classic'),
-                    color = styleEqual("Yes", 'red'))
+        formatStyle(c('LFSPRO', 'Chompret', 'Classic'), color = styleEqual("Yes", 'red'))
+    })
+  })
+  
+  observeEvent(eventExpr = input$model, handlerExpr = {
+    use.CS <<- (input$model == "CS")
+    
+    output$table <- DT::renderDataTable({
+      if (is.null(input$action)) return(DT::datatable(NULL))
+      if (input$action==0) return(DT::datatable(NULL))
+      
+      DT::datatable({
+        isolate({
+          fam.data <- famdata()
+          if (is.null(fam.data)) return(NULL)
+          cancer.data <- cancerdata()
+          if (is.null(cancer.data)) return(NULL)
+          fam.data <- fam.update(fam.data, cancer.data)
+          fam.data <- dummy.create(fam.data.process(fam.data, cancer.data))
+          cancer.data <- cancer.data.process(fam.data, cancer.data)
+          
+          fam.data$fam.id <- "fam"
+          cancer.data$fam.id <- "fam"
+          
+          cid <- cid()
+          
+          if(is.null(cid) || length(cid) == 0){
+            counselee.id <- data.frame(fam.id = fam.data$fam.id, id = fam.data$id)
+          } else {
+            idx.cid <- cid %in% fam.data$id
+            if(sum(!idx.cid) > 0){
+              cid.notfound <- cid[!idx.cid]
+              cid <- cid[idx.cid]
+              msg <- paste0("The following id(s) are not found in the input data: ",
+                            paste(cid.notfound, collapse = ", "), ".")
+              if(sum(idx.cid)==0){
+                msg <- paste0(msg, " All samples in the input file are selected for the calculation. ")
+              } else {
+                msg <- paste0(msg, " Only the following samples are selected for the calculation: ",
+                              paste(cid, collapse = ", "), ".")
+              }
+              shinyalert("ID Not Found", msg, type = "warning")
+            }
+            counselee.id <- data.frame(fam.id = "fam", id = cid)
+          }
+          
+          ## deceased patients are marked
+          id.dead <- fam.data$id[fam.data$vital == "D"]
+          counselee.dead <- counselee.id[counselee.id$id %in% id.dead,]
+          counselee.alive <- counselee.id[!counselee.id$id %in% id.dead,]
+          idx.dead <- counselee.id$id %in% id.dead
+          
+          info <- NULL
+          for(i in 1:length(counselee.id$id)){
+            id <- counselee.id$id[i]
+            idx.can <- which(cancer.data$id == id)
+            idx.fam <- which(fam.data$id == id) 
+            if (fam.data$dummy[idx.fam] == 0) {
+              info.tmp <- ""
+            } else {
+              info.tmp <- "DUMMY; "
+            }
+            if (fam.data$vital[idx.fam] == 'D')
+            {
+              info.tmp <- paste0(info.tmp,'Deceased; Was ')
+            }
+            info.tmp <- paste0(info.tmp, fam.data$age[idx.fam], " years old ")
+            info.tmp <- paste0(info.tmp, ifelse(fam.data$gender[idx.fam] == 0, "female; ", "male; "))
+            if (!is.na(fam.data$test[idx.fam])){
+              info.tmp <- paste0(info.tmp, ifelse(fam.data$gender[idx.fam] == 0, "Her ", "His "))
+              info.tmp <- paste0(info.tmp, 'confirmed genetic testing result is ', fam.data$test[idx.fam], '; ')
+            }
+            if(length(idx.can)){
+              for(j in idx.can){
+                info.tmp <- paste0(info.tmp, cancer.data$cancer.type[j], " at age ", cancer.data$diag.age[j], "; ")
+              }
+            } else {
+              info.tmp <- paste0(info.tmp, "No Cancer. ")
+            }
+            info <- c(info, info.tmp)
+          }
+          
+          # run LFSPRO on all selected patients
+          temp.fam.data <- fam.data
+          temp.fam.data$vital <- 'A'
+          
+          rltTmp <- runLFSPRO(temp.fam.data, cancer.data, counselee.id, mut.info = use.mutation)
+          rltTmp[,7:ncol(rltTmp)][idx.dead,] <- NA
+          rltTmp$info <- info
+          rltTmp <- merge(rltTmp, subset(fam.data, select = c(id, vital, age)))
+          LFSPRO.rlt <<- rltTmp
+          
+          if (use.CS == TRUE) {
+            ProbLFSPRO = LFSPRO.rlt$carrier.cs
+            LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.cs>cutoff, "Yes", "No"), 
+                            levels = c("Yes", "No"))
+          } else {
+            ProbLFSPRO = LFSPRO.rlt$carrier.mpc
+            LFSPRO = factor(ifelse(LFSPRO.rlt$carrier.mpc>cutoff, "Yes", "No"), 
+                            levels = c("Yes", "No"))
+          }
+          
+          rlt <- data.frame(
+            id = factor(LFSPRO.rlt$id, levels =  LFSPRO.rlt$id),
+            info = LFSPRO.rlt$info,
+            test = fam.genelevel(LFSPRO.rlt$test),
+            ProbLFSPRO = ProbLFSPRO,
+            LFSPRO = LFSPRO,
+            Chompret = factor(ifelse(LFSPRO.rlt$chompret, "Yes", "No"),
+                              levels = c("Yes", "No")),
+            Classic = factor(ifelse(LFSPRO.rlt$classic, "Yes", "No"),
+                             levels = c("Yes", "No")),
+            breast.5 = LFSPRO.rlt$breast.5,
+            breast.10 = LFSPRO.rlt$breast.10,
+            breast.15 = LFSPRO.rlt$breast.15,
+            sarcoma.5 = LFSPRO.rlt$sarcoma.5,
+            sarcoma.10 = LFSPRO.rlt$sarcoma.10,
+            sarcoma.15 = LFSPRO.rlt$sarcoma.15,
+            other.5 = LFSPRO.rlt$other.5,
+            other.10 = LFSPRO.rlt$other.10,
+            other.15 = LFSPRO.rlt$other.15,
+            second.5 = LFSPRO.rlt$second.5,
+            second.10 = LFSPRO.rlt$second.10,
+            second.15 = LFSPRO.rlt$second.15,
+            figure = buttonInput(
+              FUN = actionButton,
+              len = nrow(LFSPRO.rlt),
+              id = "button_",
+              label = "Risk Trend",
+              onclick = 'Shiny.onInputChange(\"lastClick\",  this.id)'
+            )
+          )
+          
+          rlt <- cbind('Details' = '&oplus;', rlt)
+          rlt
+        })
+      }, container = sketch, filter = 'top', escape = FALSE,
+      options = list(
+        columnDefs = list(
+          list(visible = FALSE, targets = c(0, 3)),
+          list(orderable = FALSE, className = 'details-control', targets = 1)
+        )
+      ),
+      callback = JS(
+        "
+        table.column(1).nodes().to$().css({cursor: 'pointer'});
+        
+        var format = function(d) {
+          return '<div style=\"background-color:#eee; padding: .5em;\"> ' +
+            d[3] + '</div>';
+        };
+        
+        table.on('click', 'td.details-control', function() {
+            var td = $(this), row = table.row(td.closest('tr'));
+            if (row.child.isShown()) {
+            row.child.hide();
+            td.html('&oplus;');
+            } else {
+            row.child(format(row.data())).show();
+            td.html('&CircleMinus;');
+            }
+        });
+        "
+      )) %>% 
+        DT::formatRound('ProbLFSPRO', 2) %>%
+        DT::formatRound(
+          c("breast.5", "breast.10", "breast.15", "sarcoma.5", "sarcoma.10", "sarcoma.15", 
+            "other.5", "other.10", "other.15", "second.5", "second.10", "second.15"), 2) %>%
+        formatStyle(c('LFSPRO', 'Chompret', 'Classic'), color = styleEqual("Yes", 'red'))
     })
   })
   
