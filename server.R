@@ -143,16 +143,7 @@ shinyServer(function(input, output) {
           if (is.null(fam.data)) return(NULL)
           cancer.data <- cancerdata()
           if (is.null(cancer.data)) return(NULL)
-          id.test <- fam.data$id[!is.na(fam.data$test)]
-          id.cancer <- unique(cancer.data$id)
-          non.informative <- FALSE
-          if ((length(id.test) <= 1) & (length(id.cancer) <= 1)) {
-            if ((length(id.test) == 1) & (length(id.cancer) == 1)) {
-              non.informative <- (id.test[1] == id.cancer[1])
-            } else {
-              non.informative <- TRUE
-            }
-          }
+          non.informative <- (nrow(cancer.data) <= 1)
           if (non.informative) {
             warning <- "Warning: This family has limited information; The predicted risks can be unreliable."
           } else {
