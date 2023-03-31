@@ -6,6 +6,7 @@ library(shinyjs)
 library(shinyalert)
 library(reshape2)
 library(ggplot2)
+library(plotly)
 library(ggsci)
 library(LFSPRO)
 
@@ -131,7 +132,7 @@ shinyServer(function(input, output) {
           names(col.label) <- c("black", "red", "blue")
           legendPlot(pedSel, affected.label = c("Affected"),
                      col = ifelse(fam.data$dummy == 0, ifelse(fam.data$proband == "Y", "red", "black"), "blue"),
-                     col.label = col.label, id = id2)
+                     col.label = col.label, id = id2, symbolsize = 1.25, cex = 1)
         })
       })
       
@@ -782,7 +783,7 @@ shinyServer(function(input, output) {
     
     showModal(modalDialog(
       title =  "Cancer Risk",
-      plotOutput("cancerrisk"),
+      plotlyOutput("cancerrisk"),
       fluidRow(
         column(
           6,
@@ -830,26 +831,23 @@ shinyServer(function(input, output) {
     rlt
   })
   
-  output$cancerrisk <- renderPlot({
+  output$cancerrisk <- renderPlotly({
     idx.button <- myValue$idx.button
     
     dplot <- data.frame(
       year = c(5, 10, 15),
-      
       Breast = c(LFSPRO.rlt$breast.5[idx.button], LFSPRO.rlt$breast.10[idx.button], LFSPRO.rlt$breast.15[idx.button]),
       Sarcoma = c(LFSPRO.rlt$sarcoma.5[idx.button], LFSPRO.rlt$sarcoma.10[idx.button], LFSPRO.rlt$sarcoma.15[idx.button]),
       Other = c(LFSPRO.rlt$other.5[idx.button], LFSPRO.rlt$other.10[idx.button], LFSPRO.rlt$other.15[idx.button]),
       Second = c(LFSPRO.rlt$second.5[idx.button], LFSPRO.rlt$second.10[idx.button], LFSPRO.rlt$second.15[idx.button]),
-      
       stringsAsFactors = FALSE
     )
+    
     Second.check <- sum(is.na(c(dplot$Second, dplot$Breast, dplot$Sarcoma, dplot$Other)))==12
     idx.rm.col <- colSums(!is.na(dplot)) > 0
     dplot <- dplot[,idx.rm.col]
-    
     if(is.null(ncol(dplot))){
       text <- ''
-      
       if(LFSPRO.rlt$vital[idx.button] == 'D'){
         text = paste("This individual is deceased and is not applicable \n for future cancer risk prediction.")
       } else if(LFSPRO.rlt$age[idx.button] >= 80){
@@ -859,25 +857,23 @@ shinyServer(function(input, output) {
         text = paste("At this time, LFSPRO has not been validated to \n",
                      "provide a risk prediction past a second primary cancer.")
       }
-      
-      gp <- ggplot() + 
-        annotate("text", x = 4, y = 25, size=6, label = text) + theme_void()
-      return(gp)
+      fig <- plot_ly(x = 2, y = 25, mode = 'text', text = text, textfont = list(size = 14)) %>%
+        layout(xaxis = list(title = "", zeroline = FALSE, showgrid = FALSE, showticklabels = FALSE),
+               yaxis = list(title = "", zeroline = FALSE, showgrid = FALSE, showticklabels = FALSE),
+               plot_bgcolor = "white")
+      return(fig)
     }
-    
     
     dplot.pop <- data.frame(
       year = c(5, 10, 15),
-      
-      Pop.Breast = c(LFSPRO.rlt$pop.breast.5[idx.button], LFSPRO.rlt$pop.breast.10[idx.button], 
-                     LFSPRO.rlt$pop.breast.15[idx.button]),
-      Pop.Sarcoma = c(LFSPRO.rlt$pop.sarcoma.5[idx.button], LFSPRO.rlt$pop.sarcoma.10[idx.button], 
-                      LFSPRO.rlt$pop.sarcoma.15[idx.button]),
-      Pop.Other = c(LFSPRO.rlt$pop.other.5[idx.button], LFSPRO.rlt$pop.other.10[idx.button], 
-                    LFSPRO.rlt$pop.other.15[idx.button]),
-      Pop.Second = c(LFSPRO.rlt$pop.second.5[idx.button], LFSPRO.rlt$pop.second.10[idx.button], 
-                     LFSPRO.rlt$pop.second.15[idx.button]),
-      
+      Breast = c(LFSPRO.rlt$pop.breast.5[idx.button], LFSPRO.rlt$pop.breast.10[idx.button], 
+                 LFSPRO.rlt$pop.breast.15[idx.button]),
+      Sarcoma = c(LFSPRO.rlt$pop.sarcoma.5[idx.button], LFSPRO.rlt$pop.sarcoma.10[idx.button], 
+                  LFSPRO.rlt$pop.sarcoma.15[idx.button]),
+      Other = c(LFSPRO.rlt$pop.other.5[idx.button], LFSPRO.rlt$pop.other.10[idx.button], 
+                LFSPRO.rlt$pop.other.15[idx.button]),
+      Second = c(LFSPRO.rlt$pop.second.5[idx.button], LFSPRO.rlt$pop.second.10[idx.button], 
+                 LFSPRO.rlt$pop.second.15[idx.button]),
       stringsAsFactors = FALSE
     )
     
@@ -886,7 +882,6 @@ shinyServer(function(input, output) {
     dplot.pop <- dplot.pop[,idx.rm.col]
     if(is.null(ncol(dplot.pop))| LFSPRO.rlt$vital[idx.button] == 'D'){
       text <- ''
-      
       if(LFSPRO.rlt$vital[idx.button] == 'D'){
         text = paste("This individual is deceased and is not applicable \n for future cancer risk prediction.")
       } else if(LFSPRO.rlt$age[idx.button] >= 80){
@@ -896,49 +891,46 @@ shinyServer(function(input, output) {
         text = paste("At this time, LFSPRO has not been validated to \n",
                      "provide a risk prediction past a second primary cancer.\n")
       }
-      gp <- ggplot() + 
-        annotate("text", x = 4, y = 25, size=6, label = text) + theme_void()
-      return(gp)
+      fig <- plot_ly(x = 2, y = 25, mode = 'text', text = text, textfont = list(size = 14)) %>%
+        layout(xaxis = list(title = "", zeroline = FALSE, showgrid = FALSE, showticklabels = FALSE),
+               yaxis = list(title = "", zeroline = FALSE, showgrid = FALSE, showticklabels = FALSE),
+               plot_bgcolor = "white")
+      return(fig)
     }
     
-    dplot.2 <- reshape2::melt(dplot, id.vars = "year", variable.name = "type", value.name = "risk")
-    dplot.2$risk[is.na(dplot.2$risk)] <- 0
-    dplot.2$risk_per <- 100 * dplot.2$risk
-    dplot.2$risk_per2 <- round(dplot.2$risk_per, 3)
-    dplot.2$year <- factor(dplot.2$year)
-    levels(dplot.2$year) <- c("5yr", "10yr", "15yr")
-    dplot.2$pop <- factor(0)
+    dplot <- reshape2::melt(dplot, id.vars = "year", variable.name = "type", value.name = "risk")
+    dplot$risk[is.na(dplot$risk)] <- 0
+    dplot$risk <- 100 * dplot$risk
+    dplot$year <- factor(dplot$year)
+    levels(dplot$year) <- c("5yr", "10yr", "15yr")
+    if (length(levels(dplot$type)) == 1) {
+      levels(dplot$type) <- "Second primary cancer"
+    }
     
-    dplot.pop.2 <- reshape2::melt(dplot.pop, id.vars = "year", variable.name = "type", value.name = "risk")
-    dplot.pop.2$risk[is.na(dplot.pop.2$risk)] <- 0
-    dplot.pop.2$risk_per <- 100 * dplot.pop.2$risk
-    dplot.pop.2$year <- factor(dplot.pop.2$year)
-    levels(dplot.pop.2$year) <- c("5yr", "10yr", "15yr")
-    levels(dplot.pop.2$type) <- levels(dplot.2$type)
-    dplot.pop.2$pop <- factor(1)
+    dplot.pop <- reshape2::melt(dplot.pop, id.vars = "year", variable.name = "type", value.name = "risk")
+    dplot.pop$risk[is.na(dplot.pop$risk)] <- 0
     
-    colors <- c("royalblue4", "firebrick1") 
-    labels <- c("Personalized cancer risk", "Population cancer risk")
+    dplot$risk_pop <- 100 * dplot.pop$risk
+    dplot$show_legend <- (dplot$type %in% c("Breast", "Second primary cancer"))
     
-    gp <- ggplot() +
-      geom_col(data = dplot.2, aes(x = year, y = risk_per, fill = pop), 
-               alpha = 0.7, width = 0.6, position = position_dodge(0.7)) +
-      geom_col(data = dplot.pop.2, aes(x = year, y = risk_per, fill = pop), 
-               width = 0.4, position = position_dodge(0.7)) +
-      geom_text(data = dplot.2, vjust = -0.25, 
-                aes(x = year, y = risk_per, label = ifelse(risk_per2 == 0, 'NA', risk_per2))) +
-      facet_wrap(~ type, strip.position = "bottom") +
-      theme_light() + 
-      scale_fill_manual(values = colors, labels = labels) +
-      labs(x = NULL, y = "Probability (%)") + 
-      theme(legend.title = element_blank(), legend.position = "bottom") + 
-      theme(text = element_text(size = 12), 
-            panel.spacing = unit(0, "lines"), 
-            strip.background = element_blank(),
-            strip.text = element_text(color = "black"),
-            strip.placement = "outside")
+    fig <- dplot %>%
+      group_by(type) %>%
+      do(p = plot_ly(., x = ~year, y = ~risk, type = "bar", alpha = 0.7,
+                     color = I("royalblue4"), name = "Personalized cancer risk", 
+                     showlegend = ~show_legend[1], 
+                     hovertemplate = "%{y:.2f}%") %>%
+           add_trace(., x = ~year, y = ~risk_pop, type = "bar", width = 0.5, alpha = 0.7,
+                     color = I("firebrick1"), name = "Population cancer risk", 
+                     showlegend = ~show_legend[1], 
+                     hovertemplate = "%{y:.2f}%") %>%
+           layout(barmode = 'overlay', 
+                  xaxis = list(title = list(text = ~type[1], font = list(size = 12), standoff = 5)), 
+                  yaxis = list(title = "Probability (%)"))) %>%
+      subplot(nrows = 1, shareX = TRUE, shareY = TRUE) %>%
+      layout(legend = list(orientation = "h", xanchor = "center", x = 0.5), 
+             hovermode = "x unified")
     
-    gp
+    fig
     
   })
   
