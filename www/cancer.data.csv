@@ -1,0 +1,10 @@
+id,cancer.type,diag.age
+0,ost,15
+0,breast,23
+5,brain,50
+5,lung,50
+9,ost,11
+12,ost,4
+14,leukemia,2
+36,non.lfs,24
+37,non.lfs,54
